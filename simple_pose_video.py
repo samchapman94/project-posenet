@@ -32,17 +32,17 @@ import os
 #          'Hindu_marriage_ceremony_offering.jpg/'
 #          '640px-Hindu_marriage_ceremony_offering.jpg -O /tmp/couple.jpg')
 #pil_image = Image.open('/tmp/couple.jpg').convert('RGB')
-engine = PoseEngine(
-    'models/mobilenet/posenet_mobilenet_v1_075_481_641_quant_decoder_edgetpu.tflite')
+#engine = PoseEngine(
+ #   'models/mobilenet/posenet_mobilenet_v1_075_481_641_quant_decoder_edgetpu.tflite')
 
-print('Inference time: %.f ms' % (inference_time * 1000))
+#print('Inference time: %.f ms' % (inference_time * 1000))
 
-for pose in poses:
-    if pose.score < 0.4: continue
-    print('\nPose Score: ', pose.score)
-    for label, keypoint in pose.keypoints.items():
-        print('  %-20s x=%-4d y=%-4d score=%.1f' %
-              (label.name, keypoint.point[0], keypoint.point[1], keypoint.score))
+#for pose in poses:
+#    if pose.score < 0.4: continue
+#    print('\nPose Score: ', pose.score)
+#    for label, keypoint in pose.keypoints.items():
+#        print('  %-20s x=%-4d y=%-4d score=%.1f' %
+#              (label.name, keypoint.point[0], keypoint.point[1], keypoint.score))
 
 
 
@@ -67,10 +67,13 @@ def main():
     args = parser.parse_args()
 
     print('Loading {} with {} labels.'.format(args.model, args.labels))
-    interpreter = make_interpreter(args.model)
-    interpreter.allocate_tensors()
-    labels = read_label_file(args.labels)
-    inference_size = input_size(interpreter)
+    engine = PoseEngine(
+    'models/mobilenet/posenet_mobilenet_v1_075_481_641_quant_decoder_edgetpu.tflite')
+    inference_size = (640, 480)
+#    interpreter = make_interpreter(args.model)
+#    interpreter.allocate_tensors()
+#    labels = read_label_file(args.labels)
+#    inference_size = input_size(interpreter)
 
     cap = cv2.VideoCapture(args.camera_idx)
 
@@ -79,6 +82,7 @@ def main():
         if not ret:
             break
         cv2_im = frame
+#        print(frame)
 #        poses, inference_time = engine.DetectPosesInImage(pil_image)
         cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
         cv2_im_rgb = cv2.resize(cv2_im_rgb, inference_size)
@@ -101,13 +105,14 @@ def append_objs_to_img(cv2_im, inference_size, poses, labels):
 
 
     for pose in poses:
-        if pose.score < 0.4: continue
+        if pose.score < 0.1: continue
 #        print('\nPose Score: ', pose.score)
         for label, keypoint in pose.keypoints.items():
-            if label.name == RIGHT_ANKLE or label.name == LEFT_ANKLE:
-                image = cv2.circle(image, (keypoint.point[0]*scale_x,keypoint.point[1]*scale_y), radius=3, color=(0, 255, 0), thickness=-1)
+            print(str(int(keypoint.point[0]))+str(int(keypoint.point[1])))
+            if label.name == 'RIGHT_ANKLE' or label.name == 'LEFT_ANKLE':
+                cv2_im = cv2.circle(cv2_im, (int(keypoint.point[0]),int(keypoint.point[1])), radius=8, color=(0, 255, 0), thickness=-1)
             else:
-                image = cv2.circle(image, (keypoint.point[0]*scale_x,keypoint.point[1]*scale_y), radius=3, color=(0, 0, 255), thickness=-1)
+                cv2_im = cv2.circle(cv2_im, (int(keypoint.point[0]),int(keypoint.point[1])), radius=8, color=(0, 0, 255), thickness=-1)
             
 #            print('  %-20s x=%-4d y=%-4d score=%.1f' %
 #                (label.name, keypoint.point[0], keypoint.point[1], keypoint.score))
@@ -126,7 +131,7 @@ def append_objs_to_img(cv2_im, inference_size, poses, labels):
 #        cv2_im = cv2.rectangle(cv2_im, (x0, y0), (x1, y1), (0, 255, 0), 2)
 #        cv2_im = cv2.putText(cv2_im, label, (x0, y0+30),
 #                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2)
-#    return cv2_im
+    return cv2_im
 
 if __name__ == '__main__':
     main()
