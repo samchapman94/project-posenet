@@ -64,7 +64,7 @@ def main():
     parser.add_argument('--camera_idx', type=int, help='Index of which video source to use. ', default = 0)
     parser.add_argument('--threshold', type=float, default=0.1,
                         help='classifier score threshold')
-    parser.add_argument('--stations', type=float, default=2,
+    parser.add_argument('--stations', type=float, default=1,
                         help='number of stations that need boxes')
     args = parser.parse_args()
 
@@ -95,8 +95,8 @@ def main():
   #      objs = get_objects(interpreter, args.threshold)[:args.top_k]
         for stat in range(args.stations):
             cv2.polylines(cv2_im, [coordinates[stat]],True,(0,0,255),2)
-        cv2_im = append_objs_to_img(cv2_im, inference_size, poses, inference_time)
-
+        cv2_im = append_objs_to_img(cv2_im, inference_size, poses, inference_time, args.stations, coordinates)
+#        cv2_im = np.uint8(cv2_im)
         cv2.imshow('frame', cv2_im)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -104,10 +104,11 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
 
-def append_objs_to_img(cv2_im, inference_size, poses, labels):
+def append_objs_to_img(cv2_im, inference_size, poses, labels, stations, coordinates):
     height, width, channels = cv2_im.shape
     scale_x, scale_y = width / inference_size[0], height / inference_size[1]
     statement = []
+    result = 'no persons detected'
 
     for pose in poses:
         if pose.score < 0.1: continue
@@ -117,15 +118,15 @@ def append_objs_to_img(cv2_im, inference_size, poses, labels):
             if label.name == 'RIGHT_ANKLE' or label.name == 'LEFT_ANKLE':
                 cv2_im = cv2.circle(cv2_im, (int(keypoint.point[0]),int(keypoint.point[1])), radius=8, color=(0, 255, 0), thickness=-1)
                 
-                statement.append(inRestrictedSection(cv2_im, inference_size, track, args.stations,restricted_region=coordinates))
+                statement.append(inRestrictedSection(cv2_im, inference_size, pose, stations,coordinates, keypoint))
             else:
                 cv2_im = cv2.circle(cv2_im, (int(keypoint.point[0]),int(keypoint.point[1])), radius=8, color=(0, 0, 255), thickness=-1)
             
 #            print('  %-20s x=%-4d y=%-4d score=%.1f' %
 #                (label.name, keypoint.point[0], keypoint.point[1], keypoint.score))
-        if len(statement)>1:
+        if statement.count('in')>1:
             result = 'person fully within machine'
-        elif result not == 'person fully within machine' or len(statement)<2:
+        elif (not result == 'person fully within machine') or statement.count('in')<2:
             result = 'person not in machine'
 
     cv2_im = cv2.putText(cv2_im, result, (20, 20),
@@ -143,19 +144,18 @@ def append_objs_to_img(cv2_im, inference_size, poses, labels):
 #        cv2_im = cv2.rectangle(cv2_im, (x0, y0), (x1, y1), (0, 255, 0), 2)
 #        cv2_im = cv2.putText(cv2_im, label, (x0, y0+30),
 #                             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2)
-    return cv2_im, result
+    return cv2_im
 
-def inRestrictedSection(cv2_im, inference_size, track, stations, restricted_region):  
+def inRestrictedSection(cv2_im, inference_size, track, stations, restricted_region, keypoint):  
     R1 = None
     statement = []
     height, width, channels = cv2_im.shape
 #    scale_x, scale_y = width / inference_size[0], height / inference_size[1]
-    statement = []
 #    print(str(scale_x)+str(scale_y))
-    x1=int(0 if track.box[0]<0 else track.box[0])
-    y1=int(0 if track.box[1]<0 else track.box[1])
-    x2=int(track.box[2])
-    y2=int(track.box[3])
+    x1=int(keypoint.point[0])-2
+    y1=int(keypoint.point[1])-2
+    x2=int(keypoint.point[0])+2
+    y2=int(keypoint.point[1])+2
 #    print('x1= '+ str(x1)+'   x2= '+str(x2)+'   y1= '+str(y1)+'   y2= '+str(y2))
 #    print(str(restricted_region[0]))
 #    print(str(restricted_region[1]))
@@ -183,13 +183,13 @@ def inRestrictedSection(cv2_im, inference_size, track, stations, restricted_regi
         Im = Im1 * Im2  
         if np.sum(np.greater(Im, 0))>0:
 #            print('in a station' + str(stat))
-            state = str(track.id) + ' in station ' + str(stat)
+            state = 'in'
             statement.append(state)
         else:
-            pass
+            state = 'out'
 
 #    statement.append(state)  
-    return statement
+    return state
 
 
 def mousepoints(event,x,y,flags,params):
